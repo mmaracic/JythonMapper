@@ -5,8 +5,10 @@
  */
 package mmaracic.javascripting;
 
+import java.io.FileNotFoundException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javax.json.JsonObject;
 import org.python.core.PyException;
 import org.python.core.PyInteger;
 import org.python.core.PyObject;
@@ -26,8 +28,9 @@ public class ScriptingMain {
         // Create an instance of the PythonInterpreter
         PythonInterpreter interp = new PythonInterpreter();
         
-        threading(interp);
-        //objects(interp);        
+        //threading(interp);
+        //sample(interp);
+        objects(interp);        
     }
     
     //multithreading test
@@ -43,8 +46,8 @@ public class ScriptingMain {
         pool.shutdown();
     }
     
-    //object mapping test
-    static void objects (PythonInterpreter interp)
+    //initial sample mapping test
+    static void sample (PythonInterpreter interp)
     {
         // The exec() method executes strings of code
         interp.exec("import sys");
@@ -59,5 +62,33 @@ public class ScriptingMain {
         // into a PyObject.
         PyObject x = interp.get("x");
         System.out.println("x: " + x);        
+    }
+    
+   //object mapping test
+    static void objects (PythonInterpreter interp)
+    {
+        try
+        {
+            JSONSample jsample = new JSONSample();
+            JsonObject j = jsample.getSample();
+            
+            // The exec() method executes strings of code
+            interp.exec("import sys");
+            interp.exec("print sys");
+
+            // Set variable values within the PythonInterpreter instance
+            interp.set("a", new PyInteger(42));
+            interp.exec("print a");
+            interp.exec("x = 2+2");
+
+            // Obtain the value of an object from the PythonInterpreter and store it
+            // into a PyObject.
+            PyObject x = interp.get("x");
+            System.out.println("x: " + x);    
+        }
+        catch(FileNotFoundException e)
+        {
+            e.printStackTrace();
+        }
     }
 }
