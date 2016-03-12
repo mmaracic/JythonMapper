@@ -5,15 +5,22 @@
  */
 package mmaracic.javascripting;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentMap;
+import javax.json.Json;
 import javax.json.JsonArray;
+import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
+import javax.json.JsonObjectBuilder;
 import javax.json.JsonValue;
 import javax.json.JsonValue.ValueType;
 import org.python.core.PyArray;
 import org.python.core.PyBoolean;
 import org.python.core.PyDictionary;
 import org.python.core.PyFloat;
+import org.python.core.PyInteger;
 import org.python.core.PyLong;
 import org.python.core.PyObject;
 import org.python.core.PyString;
@@ -42,7 +49,24 @@ public class JythonJsonMapper {
         return null;
     }
     
-    public static PyDictionary JsonToJython(JsonObject json) throws Exception
+    private static PyType determineNumberType(JsonValue value)
+    {
+        try
+        {
+            long l = Long.parseLong(value.toString());
+            return PyLong.TYPE;
+        }
+        catch (NumberFormatException ex){}
+        try
+        {
+            float f = Float.parseFloat(value.toString());
+            return PyFloat.TYPE;
+        }
+        catch (NumberFormatException ex){}
+        return null;
+    }
+    
+    public static PyDictionary JsonToJython(JsonObject json) throws IllegalArgumentException
     {
         PyDictionary pyJson = new PyDictionary();
         for(Entry<String, JsonValue> kvp: json.entrySet())
@@ -53,19 +77,19 @@ public class JythonJsonMapper {
             
             switch(type)
             {
-                case OBJECT: pyJson.put(key, JsonToJython(value)); break;
-                case ARRAY: pyJson.put(key, JsonToJython(value)); break;
+                case OBJECT: pyJson.put(key, JsonToJython((JsonObject)value)); break;
+                case ARRAY: pyJson.put(key, JsonToJython((JsonArray)value)); break;
                 case STRING: pyJson.put(key, new PyString(value.toString())); break;
-                case NUMBER: pyJson.put(key, determineNumberType(value)); break;
+                case NUMBER: pyJson.put(key, determineNumber(value)); break;
                 case TRUE: pyJson.put(key, new PyBoolean(true)); break;
                 case FALSE: pyJson.put(key, new PyBoolean(false)); break;
-                default: throw new Exception("Problematic value: "+value.toString());
+                default: throw new IllegalArgumentException("Problematic value: "+value.toString());
             }
         }
         return pyJson;
     }
     
-    public static PyArray JsonToJython(JsonArray json) throws Exception
+    public static PyArray JsonToJython(JsonArray json) throws IllegalArgumentException
     {
         PyType pType;
         ValueType jType = json.getValueType();
@@ -74,10 +98,10 @@ public class JythonJsonMapper {
             case OBJECT: pType=PyObject.TYPE; break;
             case ARRAY: pType=PyArray.TYPE; break;
             case STRING: pType=PyString.TYPE; break;
-            case NUMBER: pType=PyNumber.TYPE; break;
+            case NUMBER: pType=determineNumberType(json); break;
             case TRUE: pType=PyBoolean.TYPE; break;
             case FALSE: pType=PyBoolean.TYPE; break;
-            default: throw new Exception("Problematic type: "+jType.toString());
+            default: throw new IllegalArgumentException("Problematic type: "+jType.toString());
         }
 
         PyArray pyJson = new PyArray(pType);
@@ -87,15 +111,135 @@ public class JythonJsonMapper {
             
             switch(type)
             {
-                case OBJECT: pyJson.append(JsonToJython(value)); break;
-                case ARRAY: pyJson.append(value); break;
+                case OBJECT: pyJson.append(JsonToJython((JsonObject)value)); break;
+                case ARRAY: throw new IllegalArgumentException("Array within array!");
                 case STRING: pyJson.append(new PyString(value.toString())); break;
                 case NUMBER: pyJson.append(determineNumber(value)); break;
                 case TRUE: pyJson.append(new PyBoolean(true)); break;
                 case FALSE: pyJson.append(new PyBoolean(false)); break;
-                default: throw new Exception("Problematic value: "+value.toString());
+                default: throw new IllegalArgumentException("Problematic value: "+value.toString());
             }
         }
         return pyJson;
+    }
+    
+    public static JsonObject JythonToJson(PyDictionary pyObj) throws IllegalArgumentException
+    {
+        JsonObjectBuilder jObjBuild = Json.createObjectBuilder();
+        
+        ConcurrentMap<PyObject, PyObject> map = pyObj.getMap();
+        for(Entry<PyObject, PyObject> kvp: map.entrySet())
+        {
+            PyObject key = kvp.getKey();
+            PyObject value = kvp.getValue();
+            PyType type = value.getType();
+            
+            if (PyString.TYPE.equals(type)){
+                jObjBuild.add(key.toString(), value.toString());
+            }
+            else if (PyLong.TYPE.equals(type)){
+                jObjBuild.add(key.toString(), Long.parseLong(value.toString()));
+            }
+            else if (PyFloat.TYPE.equals(type)){
+                jObjBuild.add(key.toString(), Float.parseFloat(value.toString()));
+            }
+            else if (PyDictionary.TYPE.equals(type)){
+                jObjBuild.add(key.toString(), JythonToJson((PyDictionary)value));
+            }
+            else if (PyArray.TYPE.equals(type)){
+                jObjBuild.add(key.toString(), JythonToJson((PyArray)value));
+            } else {
+                throw new IllegalArgumentException("Problematic value: "+value.toString());
+            }
+        }
+        return jObjBuild.build();
+    }
+    
+    public static JsonArray JythonToJson(PyArray pyObj) throws IllegalArgumentException
+    {
+        JsonArrayBuilder jArrayBuild = Json.createArrayBuilder();
+        
+        PyObject[] array = (PyObject[]) pyObj.getArray();
+        for(PyObject value: array)
+        {
+            PyType type = value.getType();
+            
+            if (PyString.TYPE.equals(type)){
+                jArrayBuild.add(value.toString());
+            }
+            else if (PyLong.TYPE.equals(type)){
+                jArrayBuild.add(Long.parseLong(value.toString()));
+            }
+            else if (PyFloat.TYPE.equals(type)){
+                jArrayBuild.add(Float.parseFloat(value.toString()));
+            }
+            else if (PyDictionary.TYPE.equals(type)){
+                jArrayBuild.add(JythonToJson((PyDictionary)value));
+            }
+            else if (PyArray.TYPE.equals(type)){
+                jArrayBuild.add(JythonToJson((PyArray)value));
+            } else {
+                throw new IllegalArgumentException("Problematic value: "+value.toString());
+            }
+        }
+        return jArrayBuild.build();
+    }
+
+    public static PyObject MapToJython(Map<String,Object> map) throws Exception
+    {
+        PyDictionary pyJson = new PyDictionary();
+        for(Entry<String, Object> kvp: map.entrySet())
+        {
+            String key = kvp.getKey();
+            Object value = kvp.getValue();
+ 
+            if (value instanceof String){
+                pyJson.put(key, new PyString((String)value.toString()));
+            }
+            else if (value instanceof Long){
+                pyJson.put(key, new PyLong((Long)value));
+            }
+            else if (value instanceof Float){
+                pyJson.put(key, new PyFloat((Float)value));
+            }
+            if (value instanceof Integer){
+                pyJson.put(key, new PyInteger((Integer)value));
+            } else {   
+                 throw new IllegalArgumentException("Problematic value: "+value.toString());
+            }
+        }
+        return pyJson;        
+    }
+    
+    public static Map<String,Object> JythonToMap(PyDictionary pyObj) throws IllegalArgumentException
+    {
+        Map<String,Object> jMap = new HashMap<>();
+        
+        ConcurrentMap<PyObject, PyObject> map = pyObj.getMap();
+        for(Entry<PyObject, PyObject> kvp: map.entrySet())
+        {
+            PyObject key = kvp.getKey();
+            PyObject value = kvp.getValue();
+            PyType type = value.getType();
+            
+            if (PyString.TYPE.equals(type)){
+                jMap.put(key.toString(), value.toString());
+            }
+            if (PyLong.TYPE.equals(type)){
+                jMap.put(key.toString(), Long.parseLong(value.toString()));
+            }
+            if (PyFloat.TYPE.equals(type)){
+                jMap.put(key.toString(), Float.parseFloat(value.toString()));
+            }
+            if (PyDictionary.TYPE.equals(type)){
+                jMap.put(key.toString(), JythonToJson((PyDictionary)value));
+            }
+            if (PyArray.TYPE.equals(type)){
+                jMap.put(key.toString(), JythonToJson((PyArray)value));
+            } else {
+                throw new IllegalArgumentException("Problematic value: "+value.toString());
+            }
+        }
+        return jMap;
     }
 }

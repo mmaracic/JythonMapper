@@ -75,6 +75,8 @@ public class ScriptingMain {
             // The exec() method executes strings of code
             interp.exec("import sys");
             interp.exec("print sys");
+            interp.exec("import json");
+            interp.exec("print json");
 
             // Set variable values within the PythonInterpreter instance
             interp.set("a", new PyInteger(42));
