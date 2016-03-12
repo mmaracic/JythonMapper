@@ -66,6 +66,23 @@ public class JythonJsonMapper {
         return null;
     }
     
+    private static Class determineNumberClass(JsonValue value)
+    {
+        try
+        {
+            long l = Long.parseLong(value.toString());
+            return PyLong.class;
+        }
+        catch (NumberFormatException ex){}
+        try
+        {
+            float f = Float.parseFloat(value.toString());
+            return PyFloat.class;
+        }
+        catch (NumberFormatException ex){}
+        return null;
+    }
+    
     public static PyDictionary JsonToJython(JsonObject json) throws IllegalArgumentException
     {
         PyDictionary pyJson = new PyDictionary();
@@ -91,20 +108,25 @@ public class JythonJsonMapper {
     
     public static PyArray JsonToJython(JsonArray json) throws IllegalArgumentException
     {
-        PyType pType;
-        ValueType jType = json.getValueType();
-        switch(jType)
+        Class pClass;
+        if (json.size()>0)
         {
-            case OBJECT: pType=PyObject.TYPE; break;
-            case ARRAY: pType=PyArray.TYPE; break;
-            case STRING: pType=PyString.TYPE; break;
-            case NUMBER: pType=determineNumberType(json); break;
-            case TRUE: pType=PyBoolean.TYPE; break;
-            case FALSE: pType=PyBoolean.TYPE; break;
-            default: throw new IllegalArgumentException("Problematic type: "+jType.toString());
+            ValueType jElementType = json.get(0).getValueType();
+            switch(jElementType)
+            {
+                case OBJECT: pClass=PyObject.class; break;
+                case ARRAY: pClass=PyArray.class; break;
+                case STRING: pClass=PyString.class; break;
+                case NUMBER: pClass=determineNumberClass(json); break;
+                case TRUE: pClass=PyBoolean.class; break;
+                case FALSE: pClass=PyBoolean.class; break;
+                default: throw new IllegalArgumentException("Problematic type: "+jElementType.toString());
+            }
+        } else {
+            pClass=PyObject.class;
         }
 
-        PyArray pyJson = new PyArray(pType);
+        PyArray pyJson = new PyArray(pClass, 0);
         for(JsonValue value: json)
         {
             ValueType type = value.getValueType();
@@ -138,7 +160,11 @@ public class JythonJsonMapper {
                 jObjBuild.add(key.toString(), value.toString());
             }
             else if (PyLong.TYPE.equals(type)){
-                jObjBuild.add(key.toString(), Long.parseLong(value.toString()));
+                String valueStr = value.toString();
+                if (valueStr.endsWith("l") || valueStr.endsWith("L")){
+                    valueStr = valueStr.substring(0, valueStr.length()-1);
+                }
+                jObjBuild.add(key.toString(), Long.parseLong(valueStr));
             }
             else if (PyFloat.TYPE.equals(type)){
                 jObjBuild.add(key.toString(), Float.parseFloat(value.toString()));
@@ -168,7 +194,11 @@ public class JythonJsonMapper {
                 jArrayBuild.add(value.toString());
             }
             else if (PyLong.TYPE.equals(type)){
-                jArrayBuild.add(Long.parseLong(value.toString()));
+                String valueStr = value.toString();
+                if (valueStr.endsWith("l") || valueStr.endsWith("L")){
+                    valueStr = valueStr.substring(0, valueStr.length()-1);
+                }
+                jArrayBuild.add(Long.parseLong(valueStr));
             }
             else if (PyFloat.TYPE.equals(type)){
                 jArrayBuild.add(Float.parseFloat(value.toString()));
@@ -226,7 +256,11 @@ public class JythonJsonMapper {
                 jMap.put(key.toString(), value.toString());
             }
             if (PyLong.TYPE.equals(type)){
-                jMap.put(key.toString(), Long.parseLong(value.toString()));
+                String valueStr = value.toString();
+                if (valueStr.endsWith("l") || valueStr.endsWith("L")){
+                    valueStr = valueStr.substring(0, valueStr.length()-1);
+                }
+                jMap.put(key.toString(), Long.parseLong(valueStr));
             }
             if (PyFloat.TYPE.equals(type)){
                 jMap.put(key.toString(), Float.parseFloat(value.toString()));

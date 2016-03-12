@@ -9,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.json.JsonObject;
+import org.python.core.PyDictionary;
 import org.python.core.PyException;
 import org.python.core.PyInteger;
 import org.python.core.PyObject;
@@ -72,6 +73,8 @@ public class ScriptingMain {
             JSONSample jsample = new JSONSample();
             JsonObject j = jsample.getSample();
             
+            PyObject pj = JythonJsonMapper.JsonToJython(j);
+            
             // The exec() method executes strings of code
             interp.exec("import sys");
             interp.exec("print sys");
@@ -79,14 +82,12 @@ public class ScriptingMain {
             interp.exec("print json");
 
             // Set variable values within the PythonInterpreter instance
-            interp.set("a", new PyInteger(42));
-            interp.exec("print a");
-            interp.exec("x = 2+2");
-
-            // Obtain the value of an object from the PythonInterpreter and store it
-            // into a PyObject.
-            PyObject x = interp.get("x");
-            System.out.println("x: " + x);    
+            interp.set("pj", pj);
+            interp.exec("print pj");
+            PyObject pj2 = interp.get("pj");
+            PyDictionary pj2d = (PyDictionary) pj2;
+            JsonObject j2 = JythonJsonMapper.JythonToJson(pj2d);
+            System.out.println(pj2d);    
         }
         catch(FileNotFoundException e)
         {
