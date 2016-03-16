@@ -8,15 +8,10 @@ package mmaracic.javascripting;
 import java.io.FileNotFoundException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
 import java.util.Calendar;
-import java.util.Calendar;
-import java.util.GregorianCalendar;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.json.JsonObject;
-import org.python.core.Py;
 import org.python.core.PyDictionary;
 import org.python.core.PyException;
 import org.python.core.PyInteger;
@@ -42,7 +37,11 @@ public class ScriptingMain {
         //threading(interp);
         //sample(interp);
         //objects(interp);
-        importLib(interp);
+        //importLib(interp);
+        
+        //standalone interpreter class
+        JythonLibImportSetup jlis = new JythonLibImportSetup();
+        jlis.execute();
     }
     
     //multithreading test
@@ -136,7 +135,7 @@ public class ScriptingMain {
     
     private static long measureDurationMilis(Calendar start, Calendar finish)
     {
-        return start.toInstant().until(finish.toInstant(), ChronoUnit.MILLIS); 
+        return finish.getTimeInMillis() - start.getTimeInMillis();
     }
     
     //library import test
@@ -155,17 +154,20 @@ public class ScriptingMain {
         PySystemState sys = interp.getSystemState();
         String currPath = sys.getCurrentWorkingDir();
         System.out.println("Java sees current Python path as: "+currPath);
+        String libPath = s+"\\libs";
         String mpmathPath = s+"\\libs\\mpmath-0.19";
         String sympyPath = s+"\\libs\\sympy-1.0";
+        String gsPath = s+"\\libs\\geoscript-1.2.1";
         sys.path.append(new PyString(mpmathPath));
         sys.path.append(new PyString(sympyPath));
+        sys.path.append(new PyString(libPath));
         
         interp.exec("print sys.path");
 
         //mpmath libs\mpmath-0.19
-        interp.exec("from mpmath import mp");
-        interp.exec("mp.dps = 50");
-        interp.exec("print(mp.quad(lambda x: mp.exp(-x**2), [-mp.inf, mp.inf]) ** 2)");
+//        interp.exec("from mpmath import mp");
+//        interp.exec("mp.dps = 50");
+//        interp.exec("print(mp.quad(lambda x: mp.exp(-x**2), [-mp.inf, mp.inf]) ** 2)");
         
         //sympy \libs\sympy-1.0
         interp.exec("print('Current folder', os.getcwd());");
@@ -178,5 +180,10 @@ public class ScriptingMain {
 //        interp.exec("from sympy.core import *");
 //        interp.exec("from sympy import *");
 //        interp.exec("print(integrate(1/x, x))");
+        
+        //GeoScript
+        //interp.exec("os.chdir('"+gsPath+"')");
+        interp.exec("import geoscript");
+        
     }
 }
