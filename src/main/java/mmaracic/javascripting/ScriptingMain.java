@@ -34,9 +34,9 @@ public class ScriptingMain {
         // Create an instance of the PythonInterpreter
         PythonInterpreter interp = new PythonInterpreter();
         
-        //threading(interp);
+        threading(interp);
         //sample(interp);
-        objects(interp);
+        //objects(interp);
         //importLib(interp);
         
         //standalone interpreter class
@@ -47,7 +47,7 @@ public class ScriptingMain {
     //multithreading test
     private static void threading(PythonInterpreter interp)
     {
-        int noThreads = 10;
+        int noThreads = 100;
         int noOutputs = 10;
         ExecutorService pool = Executors.newFixedThreadPool(5);
         for (int i=0;i<noThreads;i++)
