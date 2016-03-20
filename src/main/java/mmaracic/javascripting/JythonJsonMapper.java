@@ -215,7 +215,7 @@ public class JythonJsonMapper {
         return jArrayBuild.build();
     }
 
-    public static PyObject MapToJython(Map<String,Object> map) throws Exception
+    public static PyDictionary MapToJython(Map<String,Object> map) throws Exception
     {
         PyDictionary pyJson = new PyDictionary();
         for(Entry<String, Object> kvp: map.entrySet())
