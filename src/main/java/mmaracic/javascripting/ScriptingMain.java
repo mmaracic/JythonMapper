@@ -6,15 +6,20 @@
 package mmaracic.javascripting;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Calendar;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.json.JsonObject;
+import org.python.core.PyArray;
 import org.python.core.PyDictionary;
 import org.python.core.PyException;
 import org.python.core.PyInteger;
+import org.python.core.PyList;
 import org.python.core.PyObject;
 import org.python.core.PyString;
 import org.python.core.PySystemState;
@@ -34,7 +39,8 @@ public class ScriptingMain {
         // Create an instance of the PythonInterpreter
         PythonInterpreter interp = new PythonInterpreter();
         
-        threading(interp);
+        useFunctions(interp);
+        //threading(interp);
         //sample(interp);
         //objects(interp);
         //importLib(interp);
@@ -187,6 +193,34 @@ public class ScriptingMain {
         //GeoScript
         //interp.exec("os.chdir('"+gsPath+"')");
         interp.exec("import geoscript");
+        
+    }
+    
+    private static void useFunctions(PythonInterpreter interp)
+    {
+        try {
+            FunctionsSample fs = new FunctionsSample();
+            interp.exec("import inspect");
+            
+            interp.exec(fs.getSample());
+            
+            interp.exec("objs = globals().copy()");
+            interp.exec("functions = [o for o in objs if inspect.isfunction(objs[o])]");
+            interp.exec("print(functions)");
+            
+            PyList functions = (PyList) interp.get("functions");
+            
+            interp.exec("args = inspect.getargspec("+functions.get(0)+")[0]");
+            interp.exec("print(args)");
+            
+            PyList args = (PyList) interp.get("args");
+            
+            System.out.println("Argumrnts received!"+args.toString());
+            
+            
+        } catch (IOException ex) {
+            Logger.getLogger(ScriptingMain.class.getName()).log(Level.SEVERE, null, ex);
+        }
         
     }
 }

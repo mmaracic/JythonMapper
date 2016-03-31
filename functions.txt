@@ -1,0 +1,18 @@
+def cur_mapping(testsuite,testset):
+    url_parameters="json?address=%s+%s" %(testset["country"],testset["city"])
+    return {"parameters": url_parameters, "headers": "null", "body": "null"}
+
+def output_mapping(testset,json_response_cur, run_log_id):
+    
+    address=json_response_cur["results"][0]["formatted_address"]
+    x=json_response_cur["results"][0]["geometry"]["location"]["lng"] 
+    y=json_response_cur["results"][0]["geometry"]["location"]["lat"] 
+    point="Point(%f %f," %(x,y)
+	
+    json_template={
+      "id": testset["id"],
+      "run_log_id": run_log_id,
+      "address": address,
+      "geom": point
+    }
+    return [json_template]
