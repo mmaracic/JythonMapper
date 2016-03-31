@@ -48,6 +48,7 @@ public class ScriptingMain {
         //standalone interpreter class
         //JythonLibImportSetup jlis = new JythonLibImportSetup();
         //jlis.execute();
+        datesTest(interp);
     }
     
     //multithreading test
@@ -217,10 +218,23 @@ public class ScriptingMain {
             
             System.out.println("Argumrnts received!"+args.toString());
             
+            //Provjera null-ova
+            interp.exec("res = cur_mapping({\"id\": 6}, {\"country\": \"hrv\", \"city\": \"zagreb\"})");
+            PyObject res = interp.get("res");
+            
+            System.out.println("Input mapping result received!"+res.toString());
             
         } catch (IOException ex) {
             Logger.getLogger(ScriptingMain.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        
+        }        
     }
+    
+    private static void datesTest(PythonInterpreter interp)
+    {
+        interp.exec("from datetime import datetime, date, time");
+        interp.exec("dt=datetime.now()");
+        PyObject dt = interp.get("dt");
+        
+        System.out.println("Argumrnts received!"+dt.toString());
+    }    
 }

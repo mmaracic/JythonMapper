@@ -1,6 +1,6 @@
 def cur_mapping(testsuite,testset):
     url_parameters="json?address=%s+%s" %(testset["country"],testset["city"])
-    return {"parameters": url_parameters, "headers": "null", "body": "null"}
+    return {"parameters": url_parameters, "headers": None, "body": None}
 
 def output_mapping(testset,json_response_cur, run_log_id):
     
