@@ -7,9 +7,12 @@ package mmaracic.javascripting;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Calendar;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -23,11 +26,16 @@ import org.python.core.PyList;
 import org.python.core.PyObject;
 import org.python.core.PyString;
 import org.python.core.PySystemState;
+import org.python.core.PyUnicode;
 import org.python.util.PythonInterpreter;
 
 /**
  *
  * @author Marijo
+ * 
+ * build sa: ant jar-standalone
+ * Importanje standalone jython library-a u maven:
+ *     mvn install:install-file -Dfile=.\jython-standalone.jar -DgroupId=org.python -DartifactId=jython-standalone -Dversion=2.7.1b3 -Dpackaging=jar
  */
 public class ScriptingMain {
 
@@ -39,7 +47,7 @@ public class ScriptingMain {
         // Create an instance of the PythonInterpreter
         PythonInterpreter interp = new PythonInterpreter();
         
-        useFunctions(interp);
+        //useFunctions(interp);
         //threading(interp);
         //sample(interp);
         //objects(interp);
@@ -48,7 +56,8 @@ public class ScriptingMain {
         //standalone interpreter class
         //JythonLibImportSetup jlis = new JythonLibImportSetup();
         //jlis.execute();
-        datesTest(interp);
+        //datesTest(interp);
+        stringTest(interp);
     }
     
     //multithreading test
@@ -236,5 +245,29 @@ public class ScriptingMain {
         PyObject dt = interp.get("dt");
         
         System.out.println("Argumrnts received!"+dt.toString());
-    }    
+    }
+    
+    private static void stringTest(PythonInterpreter interp)
+    {
+        try {
+            interp.exec("import sys");
+            interp.exec("print (sys.stdout.encoding)");
+            
+            String test = "ščćšžđ test string";
+            Charset myCharset = Charset.defaultCharset();
+            Map<String,Charset> charsets = Charset.availableCharsets();
+            String testNew = new String(test.getBytes("utf-16"),"utf-16");
+            byte[] bytes = test.getBytes();
+            byte[] utf8 = test.getBytes("utf-8");
+            byte[] utf16 = test.getBytes("utf-16");
+            PyUnicode stringSample = new PyUnicode(test);
+            PyUnicode stringSample2 = new PyUnicode(testNew);
+            interp.set("stringSample", stringSample);
+            interp.set("stringSample2", stringSample2);
+            interp.exec("print(stringSample.encode('windows-1250'))");
+            interp.exec("print(stringSample2)");
+        } catch (UnsupportedEncodingException ex) {
+            Logger.getLogger(ScriptingMain.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
 }

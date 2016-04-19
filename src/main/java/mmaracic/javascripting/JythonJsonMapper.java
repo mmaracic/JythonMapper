@@ -5,10 +5,14 @@
  */
 package mmaracic.javascripting;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentMap;
+
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
@@ -16,6 +20,7 @@ import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 import javax.json.JsonValue;
 import javax.json.JsonValue.ValueType;
+
 import org.python.core.PyArray;
 import org.python.core.PyBoolean;
 import org.python.core.PyDictionary;
@@ -23,7 +28,8 @@ import org.python.core.PyFloat;
 import org.python.core.PyInteger;
 import org.python.core.PyLong;
 import org.python.core.PyObject;
-import org.python.core.PyString;
+import org.python.core.PySequence;
+import org.python.core.PyUnicode;
 import org.python.core.PyType;
 
 /**
@@ -91,22 +97,27 @@ public class JythonJsonMapper {
             String key = kvp.getKey();
             JsonValue value = kvp.getValue();
             ValueType type = value.getValueType();
-            
-            switch(type)
+
+            try
             {
-                case OBJECT: pyJson.put(key, JsonToJython((JsonObject)value)); break;
-                case ARRAY: pyJson.put(key, JsonToJython((JsonArray)value)); break;
-                case STRING: pyJson.put(key, new PyString(value.toString())); break;
-                case NUMBER: pyJson.put(key, determineNumber(value)); break;
-                case TRUE: pyJson.put(key, new PyBoolean(true)); break;
-                case FALSE: pyJson.put(key, new PyBoolean(false)); break;
-                default: throw new IllegalArgumentException("Problematic value: "+value.toString());
+                switch(type)
+                {
+                    case OBJECT: pyJson.put(key, JsonToJython((JsonObject)value)); break;
+                    case ARRAY: pyJson.put(key, JsonToJython((JsonArray)value)); break;
+                    case STRING: pyJson.put(key, new PyUnicode(value.toString())); break;
+                    case NUMBER: pyJson.put(key, determineNumber(value)); break;
+                    case TRUE: pyJson.put(key, new PyBoolean(true)); break;
+                    case FALSE: pyJson.put(key, new PyBoolean(false)); break;
+                    default: throw new IllegalArgumentException("Problematic value: "+value.toString());
+                }
+            } catch (Exception ex){
+                throw ex;
             }
         }
         return pyJson;
     }
     
-    public static PyArray JsonToJython(JsonArray json) throws IllegalArgumentException
+    public static PySequence JsonToJython(JsonArray json) throws IllegalArgumentException
     {
         Class pClass;
         if (json.size()>0)
@@ -116,7 +127,7 @@ public class JythonJsonMapper {
             {
                 case OBJECT: pClass=PyObject.class; break;
                 case ARRAY: pClass=PyArray.class; break;
-                case STRING: pClass=PyString.class; break;
+                case STRING: pClass=PyUnicode.class; break;
                 case NUMBER: pClass=determineNumberClass(json); break;
                 case TRUE: pClass=PyBoolean.class; break;
                 case FALSE: pClass=PyBoolean.class; break;
@@ -130,16 +141,20 @@ public class JythonJsonMapper {
         for(JsonValue value: json)
         {
             ValueType type = value.getValueType();
-            
-            switch(type)
-            {
-                case OBJECT: pyJson.append(JsonToJython((JsonObject)value)); break;
-                case ARRAY: throw new IllegalArgumentException("Array within array!");
-                case STRING: pyJson.append(new PyString(value.toString())); break;
-                case NUMBER: pyJson.append(determineNumber(value)); break;
-                case TRUE: pyJson.append(new PyBoolean(true)); break;
-                case FALSE: pyJson.append(new PyBoolean(false)); break;
-                default: throw new IllegalArgumentException("Problematic value: "+value.toString());
+
+            try{
+                switch(type)
+                {
+                    case OBJECT: pyJson.append(JsonToJython((JsonObject)value)); break;
+                    case ARRAY: throw new IllegalArgumentException("Array within array!");
+                    case STRING: pyJson.append(new PyUnicode(value.toString())); break;
+                    case NUMBER: pyJson.append(determineNumber(value)); break;
+                    case TRUE: pyJson.append(new PyBoolean(true)); break;
+                    case FALSE: pyJson.append(new PyBoolean(false)); break;
+                    default: throw new IllegalArgumentException("Problematic value: "+value.toString());
+                }
+            } catch (Exception ex){
+                throw ex;
             }
         }
         return pyJson;
@@ -156,24 +171,30 @@ public class JythonJsonMapper {
             PyObject value = kvp.getValue();
             PyType type = value.getType();
             
-            if (PyString.TYPE.equals(type)){
+            if (type.isSubType(PyUnicode.TYPE)){
                 jObjBuild.add(key.toString(), value.toString());
             }
-            else if (PyLong.TYPE.equals(type)){
+            else if (type.isSubType(PyBoolean.TYPE)){
+                jObjBuild.add(key.toString(), Boolean.parseBoolean(value.toString()));
+            }
+            else if (type.isSubType(PyInteger.TYPE)){
+                jObjBuild.add(key.toString(), Integer.parseInt(value.toString()));
+            }
+            else if (type.isSubType(PyLong.TYPE)){
                 String valueStr = value.toString();
                 if (valueStr.endsWith("l") || valueStr.endsWith("L")){
                     valueStr = valueStr.substring(0, valueStr.length()-1);
                 }
                 jObjBuild.add(key.toString(), Long.parseLong(valueStr));
             }
-            else if (PyFloat.TYPE.equals(type)){
+            else if (type.isSubType(PyFloat.TYPE)){
                 jObjBuild.add(key.toString(), Float.parseFloat(value.toString()));
             }
-            else if (PyDictionary.TYPE.equals(type)){
+            else if (type.isSubType(PyDictionary.TYPE)){
                 jObjBuild.add(key.toString(), JythonToJson((PyDictionary)value));
             }
-            else if (PyArray.TYPE.equals(type)){
-                jObjBuild.add(key.toString(), JythonToJson((PyArray)value));
+            else if (type.isSubType(PySequence.TYPE)){
+                jObjBuild.add(key.toString(), JythonToJson((PySequence)value));
             } else {
                 throw new IllegalArgumentException("Problematic value: "+value.toString());
             }
@@ -181,33 +202,40 @@ public class JythonJsonMapper {
         return jObjBuild.build();
     }
     
-    public static JsonArray JythonToJson(PyArray pyObj) throws IllegalArgumentException
+    public static JsonArray JythonToJson(PySequence pySeq) throws IllegalArgumentException
     {
         JsonArrayBuilder jArrayBuild = Json.createArrayBuilder();
         
-        PyObject[] array = (PyObject[]) pyObj.getArray();
-        for(PyObject value: array)
+        Iterator<PyObject> it = pySeq.asIterable().iterator();
+        while(it.hasNext())
         {
+            PyObject value = it.next();
             PyType type = value.getType();
             
-            if (PyString.TYPE.equals(type)){
+            if (type.isSubType(PyUnicode.TYPE)){
                 jArrayBuild.add(value.toString());
             }
-            else if (PyLong.TYPE.equals(type)){
+            else if (type.isSubType(PyBoolean.TYPE)){
+                jArrayBuild.add(Boolean.parseBoolean(value.toString()));
+            }
+            else if (type.isSubType(PyInteger.TYPE)){
+                jArrayBuild.add(Integer.parseInt(value.toString()));
+            }
+            else if (type.isSubType(PyLong.TYPE)){
                 String valueStr = value.toString();
                 if (valueStr.endsWith("l") || valueStr.endsWith("L")){
                     valueStr = valueStr.substring(0, valueStr.length()-1);
                 }
                 jArrayBuild.add(Long.parseLong(valueStr));
             }
-            else if (PyFloat.TYPE.equals(type)){
+            else if (type.isSubType(PyFloat.TYPE)){
                 jArrayBuild.add(Float.parseFloat(value.toString()));
             }
-            else if (PyDictionary.TYPE.equals(type)){
+            else if (type.isSubType(PyDictionary.TYPE)){
                 jArrayBuild.add(JythonToJson((PyDictionary)value));
             }
-            else if (PyArray.TYPE.equals(type)){
-                jArrayBuild.add(JythonToJson((PyArray)value));
+            else if (type.isSubType(PySequence.TYPE)){
+                jArrayBuild.add(JythonToJson((PySequence)value));
             } else {
                 throw new IllegalArgumentException("Problematic value: "+value.toString());
             }
@@ -223,8 +251,11 @@ public class JythonJsonMapper {
             String key = kvp.getKey();
             Object value = kvp.getValue();
  
-            if (value instanceof String){
-                pyJson.put(key, new PyString((String)value.toString()));
+            if (value == null){
+                //skip value
+            }
+            else if (value instanceof String){
+                pyJson.put(key, new PyUnicode((String)value.toString()));
             }
             else if (value instanceof Long){
                 pyJson.put(key, new PyLong((Long)value));
@@ -232,8 +263,16 @@ public class JythonJsonMapper {
             else if (value instanceof Float){
                 pyJson.put(key, new PyFloat((Float)value));
             }
-            if (value instanceof Integer){
+            else if (value instanceof Double){
+                pyJson.put(key, new PyFloat((Double)value));
+            }
+            else if (value instanceof Integer){
                 pyJson.put(key, new PyInteger((Integer)value));
+            }
+            else if (value instanceof java.sql.Timestamp){
+                DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
+                String timeStampString = df.format((java.sql.Timestamp)value);
+                pyJson.put(key, new PyUnicode(timeStampString));
             } else {   
                  throw new IllegalArgumentException("Problematic value: "+value.toString());
             }
@@ -252,24 +291,30 @@ public class JythonJsonMapper {
             PyObject value = kvp.getValue();
             PyType type = value.getType();
             
-            if (PyString.TYPE.equals(type)){
+            if (type.isSubType(PyUnicode.TYPE)){
                 jMap.put(key.toString(), value.toString());
             }
-            if (PyLong.TYPE.equals(type)){
+            else if (type.isSubType(PyBoolean.TYPE)){
+                jMap.put(key.toString(), Boolean.parseBoolean(value.toString()));
+            }
+            else if (type.isSubType(PyInteger.TYPE)){
+                jMap.put(key.toString(), Integer.parseInt(value.toString()));
+            }
+            else if (type.isSubType(PyLong.TYPE)){
                 String valueStr = value.toString();
                 if (valueStr.endsWith("l") || valueStr.endsWith("L")){
                     valueStr = valueStr.substring(0, valueStr.length()-1);
                 }
                 jMap.put(key.toString(), Long.parseLong(valueStr));
             }
-            if (PyFloat.TYPE.equals(type)){
+            else if (type.isSubType(PyFloat.TYPE)){
                 jMap.put(key.toString(), Float.parseFloat(value.toString()));
             }
-            if (PyDictionary.TYPE.equals(type)){
+            else if (type.isSubType(PyDictionary.TYPE)){
                 jMap.put(key.toString(), JythonToJson((PyDictionary)value));
             }
-            if (PyArray.TYPE.equals(type)){
-                jMap.put(key.toString(), JythonToJson((PyArray)value));
+            else if (type.isSubType(PySequence.TYPE)){
+                jMap.put(key.toString(), JythonToJson((PySequence)value));
             } else {
                 throw new IllegalArgumentException("Problematic value: "+value.toString());
             }
