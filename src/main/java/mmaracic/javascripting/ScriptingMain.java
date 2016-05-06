@@ -57,7 +57,8 @@ public class ScriptingMain {
         //JythonLibImportSetup jlis = new JythonLibImportSetup();
         //jlis.execute();
         //datesTest(interp);
-        stringTest(interp);
+        //stringTest(interp);
+        memoryTest(interp);
     }
     
     //multithreading test
@@ -269,5 +270,24 @@ public class ScriptingMain {
         } catch (UnsupportedEncodingException ex) {
             Logger.getLogger(ScriptingMain.class.getName()).log(Level.SEVERE, null, ex);
         }
+    }
+    
+    private static void memoryTest(PythonInterpreter interp)
+    {
+        PyInteger count = new PyInteger(0);
+        interp.set("count", count);
+        for(int i=0; i<1000000; i++)
+        {
+            String test = "This is a fairly long sentence that will be serving as a memory conpsumption example";
+            PyUnicode stringSample = new PyUnicode(test);
+            interp.set("stringSample", stringSample);
+            interp.set("i", new PyInteger(i));
+            interp.exec("count+=len(stringSample)");
+            interp.exec("print(i, ': ', count)");
+            interp.cleanup();
+        }
+        count = interp.get("count", PyInteger.class);
+        System.out.println("Rezultat je "+count);
+        
     }
 }
